@@ -2,7 +2,7 @@
 // Serves the app from the phone's cache straight away (so it opens with no signal),
 // then quietly fetches any newer version for next time.
 // When you change the app, bump the version below so old files are cleared.
-const CACHE = "liftlog-v1";
+const CACHE = "liftlog-v2";
 const FILES = [
   "./",
   "./index.html",
@@ -12,9 +12,13 @@ const FILES = [
   "./icon-maskable-512.png",
   "./apple-touch-icon.png"
 ];
+const APP_PAGE = new URL("./index.html", self.location).href;
 
 self.addEventListener("install", event => {
-  event.waitUntil(caches.open(CACHE).then(c => c.addAll(FILES)).then(() => self.skipWaiting()));
+  // cache: "reload" skips the browser's own cache so a new version is never mixed with old files
+  event.waitUntil(caches.open(CACHE)
+    .then(c => c.addAll(FILES.map(u => new Request(u, {cache: "reload"}))))
+    .then(() => self.skipWaiting()));
 });
 
 self.addEventListener("activate", event => {
@@ -27,13 +31,19 @@ self.addEventListener("activate", event => {
 
 self.addEventListener("fetch", event => {
   const req = event.request;
-  if (req.method !== "GET" || new URL(req.url).origin !== self.location.origin) return;
+  const url = new URL(req.url);
+  if (req.method !== "GET" || url.origin !== self.location.origin) return;
+
+  // Opening the app (with or without "index.html" or a ?query) always means the app page
+  const isApp = req.mode === "navigate" && (url.pathname.endsWith("/") || url.pathname.endsWith("/index.html"));
+  if (req.mode === "navigate" && !isApp) return;
+  const key = isApp ? APP_PAGE : url.origin + url.pathname;
 
   event.respondWith(caches.open(CACHE).then(async cache => {
-    const cached = await cache.match(req, {ignoreSearch: true})
-      || (req.mode === "navigate" ? await cache.match("./index.html") : undefined);
-    const network = fetch(req).then(res => {
-      if (res && res.ok) cache.put(req, res.clone());
+    const cached = await cache.match(key);
+    // cache: "no-cache" checks with the server, so an old copy can't overwrite a newer one
+    const network = fetch(key, {cache: "no-cache"}).then(res => {
+      if (res && res.ok) cache.put(key, res.clone());
       return res;
     }).catch(() => undefined);
     if (cached) {

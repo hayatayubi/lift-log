@@ -185,6 +185,10 @@ select{display:block;width:100%;margin-top:8px;height:50px;border:1px solid var(
 .toast{position:fixed;left:50%;bottom:calc(var(--nav) + env(safe-area-inset-bottom,0px) + 16px);transform:translateX(-50%);width:max-content;max-width:calc(100% - 32px);background:var(--ink);color:var(--bg);padding:12px 16px;border-radius:12px;font-weight:500;z-index:30;opacity:0;pointer-events:none;transition:opacity .2s}
 .toast.show{opacity:1}
 body.has-timer .toast{bottom:calc(var(--nav) + var(--timer) + env(safe-area-inset-bottom,0px) + 16px)}
+.update{position:fixed;left:0;right:0;top:0;z-index:40;background:var(--ink);color:var(--bg);padding:calc(env(safe-area-inset-top,0px) + 10px) 16px 10px}
+.update-in{max-width:528px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;gap:12px}
+.update p{margin:0;font-weight:500}
+.update button{appearance:none;border:1px solid currentColor;background:transparent;color:inherit;border-radius:999px;height:40px;padding:0 16px;font:600 .95rem var(--body);cursor:pointer;flex:none}
 
 @media (max-width:360px){
   .disc{width:52px;height:52px}
@@ -280,6 +284,9 @@ body.has-timer .toast{bottom:calc(var(--nav) + var(--timer) + env(safe-area-inse
   </div>
 </div>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
+<div class="update" id="update" hidden role="status">
+  <div class="update-in"><p>Lift log has been updated.</p><button type="button" id="updateBtn">Reload</button></div>
+</div>
 
 <nav class="nav" aria-label="Sections">
   <div class="nav-in">
@@ -301,7 +308,8 @@ body.has-timer .toast{bottom:calc(var(--nav) + var(--timer) + env(safe-area-inse
 /* ---------- Exercise library ----------
    kind: db | machine | cable (sets the weight jump)
    u: "hand" = weight per hand, "kg" = one weight or a stack
-   side: reps logged per side, small: small muscle (big jumps relative to load) */
+   side: reps logged per side, small: small muscle (big jumps relative to load)
+   retired: day it used to be on; no longer in the plan but kept so its history still shows */
 const LIB = {
   "db-press":               {name:"Flat dumbbell press", m:"chest", kind:"db"},
   "machine-press":          {name:"Machine chest press", m:"chest", kind:"machine"},
@@ -312,8 +320,12 @@ const LIB = {
   "cs-db-row":              {name:"Chest-supported dumbbell row", m:"upper back", kind:"db", note:"Lie face down on an incline bench"},
   "lateral-raise":          {name:"Lateral raise", m:"side delts", kind:"db", small:true},
   "cable-lateral":          {name:"Cable lateral raise", m:"side delts", kind:"cable", side:true, small:true},
-  "reverse-pec":            {name:"Reverse pec deck", m:"rear delts", kind:"machine"},
+  "sa-cable-pulldown":      {name:"Single-arm cable pulldown", m:"lats", kind:"cable", side:true, note:"Kneel at a cable stack with one handle set high"},
+  "straight-arm-pulldown":  {name:"Straight-arm cable pulldown", m:"lats", kind:"cable", note:"Rope or bar on a high cable, arms kept straight"},
+  "db-pullover":            {name:"Dumbbell pullover", m:"lats, chest", kind:"db", u:"kg", note:"One dumbbell, held with both hands"},
+  "face-pull":              {name:"Cable face pull", m:"rear delts, upper back", kind:"cable", note:"Rope at head height, pull towards your forehead"},
   "db-rear-fly":            {name:"Dumbbell rear delt fly", m:"rear delts", kind:"db", small:true},
+  "reverse-pec":            {name:"Reverse pec deck", m:"rear delts", kind:"machine", retired:"D1"},
   "leg-press":              {name:"Leg press", m:"quads, glutes", kind:"machine"},
   "goblet-squat":           {name:"Goblet squat", m:"quads, glutes", kind:"db", u:"kg", note:"One dumbbell, held at your chest"},
   "db-rdl":                 {name:"Dumbbell Romanian deadlift", m:"hamstrings, glutes", kind:"db"},
@@ -344,11 +356,11 @@ const LIB = {
 const PLAN = [
   {id:"D1", name:"Day 1", focus:"Upper body", title:"Chest, back and shoulders", c:"red", slots:[
     {sets:3, lo:8,  hi:12, opts:["db-press","machine-press"]},
-    {sets:3, lo:8,  hi:12, opts:["lat-pulldown"]},
+    {sets:3, lo:8,  hi:12, opts:["lat-pulldown","sa-cable-pulldown","db-pullover"]},
     {sets:3, lo:8,  hi:12, opts:["incline-db-press","incline-machine-press"]},
     {sets:3, lo:10, hi:12, opts:["seated-row","cs-db-row"]},
     {sets:3, lo:12, hi:20, opts:["lateral-raise","cable-lateral"]},
-    {sets:2, lo:12, hi:20, opts:["reverse-pec","db-rear-fly"]}
+    {sets:2, lo:12, hi:20, opts:["face-pull","db-rear-fly"]}
   ]},
   {id:"D2", name:"Day 2", focus:"Legs and arms", title:"Legs and arms", c:"blue", slots:[
     {sets:3, lo:8,  hi:12, opts:["leg-press","goblet-squat"]},
@@ -362,7 +374,7 @@ const PLAN = [
     {sets:3, lo:8,  hi:12, opts:["db-shoulder-press","machine-shoulder-press"]},
     {sets:3, lo:8,  hi:12, opts:["machine-press","db-press"]},
     {sets:3, lo:8,  hi:12, opts:["db-row"]},
-    {sets:3, lo:10, hi:12, opts:["cg-pulldown"]},
+    {sets:3, lo:10, hi:12, opts:["cg-pulldown","sa-cable-pulldown","straight-arm-pulldown","db-pullover"]},
     {sets:2, lo:12, hi:15, opts:["pec-deck","cable-fly","db-fly"]},
     {sets:3, lo:12, hi:20, opts:["lateral-raise","cable-lateral"]}
   ]},
@@ -632,18 +644,21 @@ function chartSVG(pts){
   const xl = '<text class="axis" x="' + L + '" y="' + (H - 8) + '">' + shortDate(pts[0].t) + '</text><text class="axis" x="' + (W - R) + '" y="' + (H - 8) + '" text-anchor="end">' + shortDate(last.t) + '</text>';
   return '<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="Estimated max over time, latest ' + fmt(last.e) + ' kg">' + grid + '<path class="line" d="' + path + '"/>' + dots + lbl + xl + '</svg>';
 }
-function dayFor(vid){ return PLAN.find(d => d.slots.some(s => s.opts.indexOf(vid) >= 0)); }
+function dayFor(vid){ return PLAN.find(d => d.slots.some(s => s.opts.indexOf(vid) >= 0)) || DAYS[LIB[vid].retired] || PLAN[0]; }
 function renderProgress(){
   const logged = VARIANTS.filter(v => historyOf(v).length);
   const rest = VARIANTS.filter(v => logged.indexOf(v) < 0);
-  if(!progPicked || VARIANTS.indexOf(progEx) < 0){
+  const retired = Object.keys(LIB).filter(v => VARIANTS.indexOf(v) < 0 && historyOf(v).length);
+  const choices = VARIANTS.concat(retired);
+  if(!progPicked || choices.indexOf(progEx) < 0){
     progEx = VARIANTS[0];
-    if(sessions.length){ const s = sessions[0]; const v = VARIANTS.find(v => setsOf(s, v)); if(v) progEx = v; }
+    if(sessions.length){ const s = sessions[0]; const v = choices.find(v => setsOf(s, v)); if(v) progEx = v; }
   }
   const opt = v => '<option value="' + v + '"' + (v === progEx ? " selected" : "") + '>' + esc(label(v)) + '</option>';
   $("#exSelect").innerHTML =
     (logged.length ? '<optgroup label="Logged">' + logged.map(opt).join("") + '</optgroup>' : '') +
-    (rest.length ? '<optgroup label="Not logged yet">' + rest.map(opt).join("") + '</optgroup>' : '');
+    (rest.length ? '<optgroup label="Not logged yet">' + rest.map(opt).join("") + '</optgroup>' : '') +
+    (retired.length ? '<optgroup label="No longer in your plan">' + retired.map(opt).join("") + '</optgroup>' : '');
   $("#v-progress").setAttribute("style", dayVars(dayFor(progEx)));
   const rows = historyOf(progEx), name = LIB[progEx].name;
   if(!rows.length){
@@ -960,7 +975,19 @@ window.addEventListener("storage", e => {
 day = initialDay();
 render();
 if("serviceWorker" in navigator && (location.protocol === "https:" || location.hostname === "localhost" || location.hostname === "127.0.0.1")){
-  window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("sw.js").then(reg => {
+      // Phones resume home-screen apps without reloading them, so check for a new version on every return
+      document.addEventListener("visibilitychange", () => { if(document.visibilityState === "visible") reg.update().catch(() => {}); });
+    }).catch(() => {});
+  });
+  // A new version has taken over: offer a reload (your entries are saved first)
+  let hadController = !!navigator.serviceWorker.controller;
+  navigator.serviceWorker.addEventListener("controllerchange", () => {
+    if(!hadController){ hadController = true; return; }
+    $("#update").hidden = false;
+  });
+  $("#updateBtn").addEventListener("click", () => { saveDraftsNow(); location.reload(); });
 }
 })();
 </script>
