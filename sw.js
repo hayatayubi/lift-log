@@ -2,7 +2,7 @@
 // Serves the app from the phone's cache straight away (so it opens with no signal),
 // then quietly fetches any newer version for next time.
 // When you change the app, bump the version below so old files are cleared.
-const CACHE = "liftlog-v3";
+const CACHE = "liftlog-v4";
 const FILES = [
   "./",
   "./index.html",
