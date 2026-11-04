@@ -328,12 +328,16 @@ const LIB = {
   "reverse-pec":            {name:"Reverse pec deck", m:"rear delts", kind:"machine", retired:"D1"},
   "leg-press":              {name:"Leg press", m:"quads, glutes", kind:"machine"},
   "goblet-squat":           {name:"Goblet squat", m:"quads, glutes", kind:"db", u:"kg", note:"One dumbbell, held at your chest"},
-  "db-rdl":                 {name:"Dumbbell Romanian deadlift", m:"hamstrings, glutes", kind:"db"},
+  "back-ext":               {name:"45° back extension", m:"hamstrings, glutes", kind:"db", u:"kg", note:"Hinge at the hips. Log 0 kg for bodyweight, or hold a plate or dumbbell to your chest"},
+  "pull-through":           {name:"Cable pull-through", m:"glutes, hamstrings", kind:"cable", note:"Rope on a low cable, face away and hinge at the hips"},
+  "db-rdl":                 {name:"Dumbbell Romanian deadlift", m:"hamstrings, glutes", kind:"db", retired:"D2"},
   "leg-ext":                {name:"Leg extension", m:"quads", kind:"machine"},
   "seated-leg-curl":        {name:"Seated leg curl", m:"hamstrings", kind:"machine"},
   "lying-leg-curl":         {name:"Lying leg curl", m:"hamstrings", kind:"machine"},
   "db-curl":                {name:"Dumbbell curl", m:"biceps", kind:"db", small:true},
   "cable-curl":             {name:"Cable curl", m:"biceps", kind:"cable", small:true},
+  "tri-ext-machine":        {name:"Triceps extension machine", m:"triceps", kind:"machine"},
+  "dip-machine":            {name:"Seated dip machine", m:"triceps, chest", kind:"machine"},
   "pushdown":               {name:"Cable triceps pushdown", m:"triceps", kind:"cable"},
   "db-skull":               {name:"Dumbbell skull crusher", m:"triceps", kind:"db"},
   "db-shoulder-press":      {name:"Seated dumbbell shoulder press", m:"shoulders", kind:"db"},
@@ -364,11 +368,11 @@ const PLAN = [
   ]},
   {id:"D2", name:"Day 2", focus:"Legs and arms", title:"Legs and arms", c:"blue", slots:[
     {sets:3, lo:8,  hi:12, opts:["leg-press","goblet-squat"]},
-    {sets:3, lo:8,  hi:12, opts:["db-rdl"]},
+    {sets:3, lo:8,  hi:12, opts:["back-ext","pull-through"]},
     {sets:2, lo:12, hi:15, opts:["leg-ext"]},
     {sets:2, lo:10, hi:15, opts:["seated-leg-curl","lying-leg-curl"]},
     {sets:3, lo:10, hi:15, opts:["db-curl","cable-curl"]},
-    {sets:3, lo:10, hi:15, opts:["pushdown","db-skull"]}
+    {sets:3, lo:10, hi:15, opts:["tri-ext-machine","dip-machine","pushdown","db-skull"]}
   ]},
   {id:"D3", name:"Day 3", focus:"Upper body", title:"Chest, back and shoulders", c:"yellow", slots:[
     {sets:3, lo:8,  hi:12, opts:["db-shoulder-press","machine-shoulder-press"]},
@@ -404,6 +408,7 @@ const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const round2 = n => Math.round(n * 100) / 100;
 const fmt = n => Number.isInteger(n) ? String(n) : String(round2(n));
+const kg = w => w === 0 ? "bodyweight" : fmt(w) + " kg";
 const parseNum = v => parseFloat(String(v).replace(",", "."));
 const fmtDate = ms => new Date(ms).toLocaleDateString("en-GB", {weekday:"short", day:"numeric", month:"short"});
 const shortDate = ms => new Date(ms).toLocaleDateString("en-GB", {day:"numeric", month:"short"});
@@ -451,8 +456,8 @@ const historyOf = vid => sessions.filter(s => setsOf(s, vid));
 const nextAfter = id => ORDER[(ORDER.indexOf(id) + 1) % ORDER.length];
 const nextDay = () => sessions.length ? nextAfter(sessions[0].day) : ORDER[0];
 function setsStr(sets){
-  if(sets.every(s => s.w === sets[0].w)) return fmt(sets[0].w) + " kg × " + sets.map(s => s.r).join(", ");
-  return sets.map(s => fmt(s.w) + " kg × " + s.r).join(", ");
+  if(sets.every(s => s.w === sets[0].w)) return kg(sets[0].w) + " × " + sets.map(s => s.r).join(", ");
+  return sets.map(s => kg(s.w) + " × " + s.r).join(", ");
 }
 
 /* ---------- Weight suggestions (double progression + stall check) ---------- */
@@ -483,7 +488,7 @@ function advice(vid, slot){
       : "Every set hit " + slot.hi + ". Move up to " + fmt(nw) + " kg."};
   }
   if(isStalled(hist, vid)) return {w:top, cls:"stall", text:"No progress in your last 3 sessions. Check your sleep and food, then try a lighter week: same weight, half the sets."};
-  return {w:top, cls:"", text:"Stay at " + fmt(top) + " kg and beat last time by a rep or two."};
+  return {w:top, cls:"", text:"Stay at " + kg(top) + " and beat last time by a rep or two."};
 }
 
 /* ---------- Drafts: unsaved entries, kept while you train ---------- */
@@ -674,7 +679,7 @@ function renderProgress(){
     (pts.length >= 2
       ? '<p class="explain">Estimated max from your best set each session. It rises when you add reps or weight.</p>'
       : '<p class="explain">Log this exercise once more to see a trend line.</p>') +
-    '<p class="best">Best set so far: <span>' + fmt(best.w) + ' kg × ' + best.r + '</span>, ' + fmtDate(bestDate) + '</p>' +
+    '<p class="best">Best set so far: <span>' + kg(best.w) + ' × ' + best.r + '</span>, ' + fmtDate(bestDate) + '</p>' +
     '<ul class="plist">' + rows.map(s => '<li><span class="hd">' + fmtDate(s.createdAt) + '</span><span class="hs">' + setsStr(setsOf(s, progEx)) + '</span></li>').join("") + '</ul>';
 }
 
